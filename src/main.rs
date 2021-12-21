@@ -3,7 +3,6 @@ use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 use petgraph::Graph;
 use rand::distributions::Distribution;
-use rand::seq::SliceRandom;
 use rand::{thread_rng, Rng};
 use rand_distr::Beta;
 use std::collections::HashMap;
@@ -75,44 +74,6 @@ struct Simulation {
     nodes: Vec<NodeIndex>,
 }
 
-fn run_first_round(
-    players: Vec<Player>,
-    mut matches: Graph<Player, i32>,
-    nodes: Vec<NodeIndex>,
-) -> (HashMap<Player, usize>, Graph<Player, i32>) {
-    let mut rng = thread_rng();
-
-    // setup stats runner
-    let mut results: HashMap<Player, usize> = HashMap::new();
-    for player in players.iter() {
-        results.insert(*player, 0);
-    }
-
-    // setup Graph
-    for (l, r) in players.clone().iter().zip(players.clone().iter()) {
-        if l.id > r.id {
-            matches.update_edge(nodes[l.id], nodes[r.id], 0);
-        }
-    }
-
-    // find random pairing and run
-    let mut opponents: Vec<Player> = players.clone();
-    opponents.shuffle(&mut rng);
-    // TODO: abstract this out
-    for chunk in opponents.chunks(2) {
-        let a = chunk[0];
-        let b = chunk[1];
-        let pairing = Match { a, b };
-        let winner = pairing.simulate();
-        results.insert(winner, 1 + results[&winner]);
-        // super low weight since the round is done
-        matches.update_edge(nodes[a.id], nodes[b.id], 10000);
-        println! {"{a} ({a_strength:.2}) won vs {b} ({b_strength:.2}) for a total of {n} wins",
-        a=a.id, a_strength=a.strength, b_strength=b.strength,b=b.id, n=results[&winner]};
-    }
-    (results, matches)
-}
-
 fn run_round(
     players: Vec<Player>,
     mut matches: Graph<Player, i32>,
@@ -148,7 +109,7 @@ fn run_round(
         if idx > *vert {
             let a = players[idx];
             let b = players[*vert];
-            let diff: i32 = (results[&a] as i32 - results[&b] as i32).abs();
+            // let diff: i32 = (results[&a] as i32 - results[&b] as i32).abs();
             // println! {"{a_n} vs {b_n} wins ---- {diff}", a_n=results[&a], b_n=results[&b], diff=diff};
             let pairing = Match { a, b };
             let winner = pairing.simulate();
@@ -212,14 +173,21 @@ impl Simulation {
         }
         let mut res_vec: Vec<(&Player, &usize)> = results.iter().collect();
         res_vec.sort_by(|a, b| a.0.id.cmp(&b.0.id));
-        println! {"-------"}
-        for res in res_vec {
-            println! {"Player {player} ({strength:.2}) won {n} games", player=res.0.id, n=res.1, strength=res.0.strength}
-        }
+        // println! {"-------"}
+        // for res in res_vec {
+        //     println! {"Player {player} ({strength:.2}) won {n} games", player=res.0.id, n=res.1, strength=res.0.strength}
+        // }
     }
 }
 
 fn main() {
-    let sim = Simulation::new(64, 6);
-    sim.run();
+    let args: Vec<String> = std::env::args().collect();
+    let n_teams: usize = args[1].parse().expect("not an int");
+    let n_rounds: usize = args[2].parse().expect("not an int");
+    let n_sims: usize = args[3].parse().expect("not an int");
+
+    for _ in 0..n_sims {
+        let sim = Simulation::new(n_teams, n_rounds);
+        sim.run();
+    }
 }
